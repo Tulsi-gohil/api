@@ -168,7 +168,7 @@ app.post("/api/domain", async (req, res) => {
     );
 
     const domainID = Response.data.domainID;
-
+  
     if (!domainID) {
       return res.status(404).json({
         success: false,
