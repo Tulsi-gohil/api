@@ -19,7 +19,7 @@ function Domin() {
     setData(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/domain", {
+      const response = await fetch("https://mediumturquoise-lemur-967744.hostingersite.com/api/domain", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
