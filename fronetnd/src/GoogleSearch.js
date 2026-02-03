@@ -19,7 +19,7 @@ function GoogleSearch (){
     setResults([]);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/search", {
+      const res = await axios.post("https://mediumturquoise-lemur-967744.hostingersite.com/api/search", {
         query: query,
       });
 
