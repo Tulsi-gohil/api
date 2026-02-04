@@ -139,11 +139,11 @@ function Domin() {
   
     {data.result.cl_data.map((item, index) => (
       <tr key={index}>
-        <td>{index + 1}</td>
-        <td>{item.email}</td>
-        <td>{item.password}</td>
-        <td>{item.leaked_date}</td>
-        <td>{item.leaked_from}</td>
+        <td>{index + 1 || "N/A"}</td>
+        <td>{item.email || "N/A"}</td>
+        <td>{item.password || "N/A"}</td>
+        <td>{item.leaked_date || "N/A"}</td>
+        <td>{item.leaked_from || "N/A"}</td>
       </tr>
     ))}
   </tbody>
@@ -169,10 +169,10 @@ function Domin() {
   
     {data.result.cb_data.map((item, index) => (
       <tr key={index}>
-        <td>{index + 1}</td>
-        <td>{item.user}</td>
-        <td>{item.password}</td>
-        <td>{item.leaked_date}</td>
+        <td>{index + 1 || "N/A"}</td>
+        <td>{item.user || "N/A"}</td>
+        <td>{item.password || "N/A"}</td>
+        <td>{item.leaked_date || "N/A"}</td>
        
       </tr>
     ))}
