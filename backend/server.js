@@ -216,105 +216,89 @@ app.post("/api/domain", async (req, res) => {
 
 app.post("/api/vahan", async (req, res) => {
   try {
-    const response = await axios.get(
+    const jar = new CookieJar();
+    const client = wrapper(axios.create({ jar, withCredentials: true }));
+
+    // 1️⃣ Load login page (creates session)
+    const pageRes = await client.get(
       "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
 
-    const cookies = response.headers["set-cookie"];
-    const sessionCookie = cookies.find(c => c.startsWith("JSESSIONID")).split(";")[0];
-
-    const $ = cheerio.load(response.data);
+    const $ = cheerio.load(pageRes.data);
     const viewState = $("input[name='javax.faces.ViewState']").val();
 
-    const captchaImg = await axios.get(
+    // 2️⃣ Load captcha (same session)
+    const captchaRes = await client.get(
       "https://vahan.parivahan.gov.in/nrservices/cap_img.jsp",
-      {},
       {
+        responseType: "arraybuffer",
         headers: {
-          Cookie: sessionCookie,
+          Referer: "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
           "User-Agent": "Mozilla/5.0",
         },
-        responseType: "arraybuffer",
       }
     );
 
-    const captchaBase64 = Buffer.from(captchaImg.data).toString("base64");
+    const captchaBase64 = Buffer.from(captchaRes.data).toString("base64");
 
     res.json({
       success: true,
       captchaBase64,
       viewState,
-      sessionCookie,
     });
 
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 });
-
-    app.post("/api/login", async (req, res) => {
+app.post("/api/login", async (req, res) => {
   try {
-    const { mobile_no, captcha, viewState, sessionCookie } = req.body;
+    const { captcha, mobile_no, viewState } = req.body;
 
-    if (!mobile_no || !captcha || !viewState || !sessionCookie) {
-      return res.status(400).json({ success: false, message: "Body data missing" });
-    }
+    const jar = new CookieJar();
+    const client = wrapper(axios.create({ jar, withCredentials: true }));
 
-    const formData = new URLSearchParams();
-    formData.append("loginForm", "loginForm");
-    formData.append("loginForm:txt_MOBILE_NO", mobile_no);
-    formData.append("loginForm:txt_ALPHA_NUMERIC", captcha);
-    formData.append("loginForm:btnLogin", "next");
-    formData.append("javax.faces.ViewState", viewState);
+    const formData = qs.stringify({
+      "loginForm": "loginForm",
+      "loginForm:txt_MOBILE_NO": mobile_no,
+      "loginForm:txt_ALPHA_NUMERIC": captcha,
+      "loginForm:btnLogin": "Next",
+      "javax.faces.ViewState": viewState,
+    });
 
-    const response = await axios.post(
+    const response = await client.post(
       "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
-      formData.toString(),
+      formData,
       {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent": "Mozilla/5.0",
-          "Cookie": sessionCookie,
           "Referer":
             "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
           "Origin": "https://vahan.parivahan.gov.in",
         },
+        maxRedirects: 0,
       }
     );
 
     const html = response.data;
 
-    // 🔍 RESULT CHECK
+    let message;
     if (html.includes("txt_PASSWORD")) {
-      return res.json({
-        success: true,
-        registered: true,
-        message: "Password page opened (User registered)",
-      });
-    }
-
-    if (html.includes("Invalid") || html.includes("not registered")) {
-      return res.json({
-        success: true,
-        registered: false,
-        message: "User not registered",
-      });
-    }
-
-    res.json({
-      success: false,
-      message: "Captcha wrong or unknown response",
-    });
+      message = "User is REGISTERED ✅";
+    } else if (html.includes("not registered")) {
+      message = "User is NOT registered ❌";
+    } 
+    res.json({ success: true, message });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Login Error:", err.message);
+    res.status(500).json({ success: false });
   }
 });
 
-  
 
 // app.post("/api/vahan", async (req, res) => {
 //   const { mobile_no } = req.body;
