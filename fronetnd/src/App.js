@@ -5,6 +5,7 @@ import GoogleSearch from "./GoogleSearch";
 import ApiAccount from "./ApiAccount";
 import StudentDetils from "./StudentDetils";
 import Domin from "./Domin";
+import Api from "./Api";
 function App() {
   return(
     <>
@@ -13,7 +14,9 @@ function App() {
         <Route path="/GoogleSearch" element={<GoogleSearch />}/>
         <Route path="/ApiAccount" element={<ApiAccount />}/>
         <Route path="/StudentDetils" element={<StudentDetils />}/>
-        <Route path="/" element={<Domin/>}/>
+        <Route path="/Domin" element={<Domin/>}/>
+        <Route path="/" element={<Api/>}/>
+      
       </Routes>
     </Router>
     </>

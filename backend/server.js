@@ -2,14 +2,23 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-const dbcon= require("./libs/db")
+const dbcon= require("./libs/db");
 const he =require("he");
+const cheerio = require("cheerio");
+const qs =require("qs");
+ 
+ 
+ 
 
+const { wrapper } = require("axios-cookiejar-support");
+const { CookieJar } = require("tough-cookie");
 const Search = require("./models/Search");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
  
 dbcon();
 // Test route
@@ -144,6 +153,9 @@ app.post("/api/student", async (req, res) => {
     });
   }
 });  
+const dns = require('node:dns');
+dns.setDefaultResultOrder('ipv4first');
+
 app.post("/api/domain", async (req, res) => {
   const { user_input } = req.body;
 
@@ -176,12 +188,13 @@ app.post("/api/domain", async (req, res) => {
       });
     }
  
-    const response2 = await axios.get(
+    const response2 = await axios.post(
       `https://lab.stealthmole.com/report/credentials?domain_id=${domainID}`,
    { },
       {
         headers: {
           "Content-Type": "application/json",
+          Cookie:"C27297A778BF5D2DB517F08F36445AE5"
         },
       }
     );
@@ -199,7 +212,188 @@ app.post("/api/domain", async (req, res) => {
       message: "Failed to fetch domain report",
     });
   }
+      }); 
+
+app.post("/api/vahan", async (req, res) => {
+  try {
+    const response = await axios.get(
+      "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+
+    const cookies = response.headers["set-cookie"];
+    const sessionCookie = cookies.find(c => c.startsWith("JSESSIONID")).split(";")[0];
+
+    const $ = cheerio.load(response.data);
+    const viewState = $("input[name='javax.faces.ViewState']").val();
+
+    const captchaImg = await axios.get(
+      "https://vahan.parivahan.gov.in/nrservices/cap_img.jsp",
+      {},
+      {
+        headers: {
+          Cookie: sessionCookie,
+          "User-Agent": "Mozilla/5.0",
+        },
+        responseType: "arraybuffer",
+      }
+    );
+
+    const captchaBase64 = Buffer.from(captchaImg.data).toString("base64");
+
+    res.json({
+      success: true,
+      captchaBase64,
+      viewState,
+      sessionCookie,
+    });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
+
+    app.post("/api/login", async (req, res) => {
+  try {
+    const { mobile_no, captcha, viewState, sessionCookie } = req.body;
+
+    if (!mobile_no || !captcha || !viewState || !sessionCookie) {
+      return res.status(400).json({ success: false, message: "Body data missing" });
+    }
+
+    const formData = new URLSearchParams();
+    formData.append("loginForm", "loginForm");
+    formData.append("loginForm:txt_MOBILE_NO", mobile_no);
+    formData.append("loginForm:txt_ALPHA_NUMERIC", captcha);
+    formData.append("loginForm:btnLogin", "next");
+    formData.append("javax.faces.ViewState", viewState);
+
+    const response = await axios.post(
+      "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
+      formData.toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0",
+          "Cookie": sessionCookie,
+          "Referer":
+            "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
+          "Origin": "https://vahan.parivahan.gov.in",
+        },
+      }
+    );
+
+    const html = response.data;
+
+    // 🔍 RESULT CHECK
+    if (html.includes("txt_PASSWORD")) {
+      return res.json({
+        success: true,
+        registered: true,
+        message: "Password page opened (User registered)",
+      });
+    }
+
+    if (html.includes("Invalid") || html.includes("not registered")) {
+      return res.json({
+        success: true,
+        registered: false,
+        message: "User not registered",
+      });
+    }
+
+    res.json({
+      success: false,
+      message: "Captcha wrong or unknown response",
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+  
+
+// app.post("/api/vahan", async (req, res) => {
+//   const { mobile_no } = req.body;
+
+//   if (!mobile_no || mobile_no.length !== 10) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "Mobile number required",
+//     });
+//   }
+
+//   try {
+//     // STEP 1: First request (get login page to create session)
+//     const response = await axios.get(
+//       "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
+//       { mobile_no},
+//       {
+//         headers: {
+//           "User-Agent": "Mozilla/5.0",
+           
+//         },
+//       }
+//     );
+
+//     // STEP 2: Extract JSESSIONID from cookies
+//     const cookies = response.headers["set-cookie"];
+//     let session = null;
+
+//     if (cookies) {
+//       const jsession = cookies.find(c => c.includes("JSESSIONID"));
+//       if (jsession) {
+//         session = jsession.split(";")[0]; // JSESSIONID=xxxx
+//       }
+//     }
+
+//     if (!session) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Session id not found",
+//       });
+//     }
+
+//     // STEP 3: Load page again using session
+//     const response2 = await axios.get(
+//       "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
+//       {
+//         headers: {
+//           Cookie: session,
+//           "User-Agent": "Mozilla/5.0",
+//         },
+//       }
+//     );
+
+//     // STEP 4: Parse HTML
+//     const html = response2.data;
+//     const $ = cheerio.load(html);
+
+//     // STEP 5: Check password field
+//     const password = $("password") ;
+
+//     let message = "User not registered";
+
+//     if (password  ) {
+//       message = "User is registered";
+//     }
+
+//     res.json({
+//       success: true,
+//       message,
+//     });
+
+//   } catch (err) {
+//     console.error(err.message);
+//     res.status(500).json({
+//       success: false,
+//       message: "Vahan check failed",
+//     });
+//   }
+// });
 
 app.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);
