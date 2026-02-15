@@ -6,10 +6,6 @@ const dbcon= require("./libs/db");
 const he =require("he");
 const cheerio = require("cheerio");
 const qs =require("qs");
- 
- 
- 
-
 const { wrapper } = require("axios-cookiejar-support");
 const { CookieJar } = require("tough-cookie");
 const Search = require("./models/Search");
@@ -17,8 +13,7 @@ const Search = require("./models/Search");
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
+ 
  
 dbcon();
 // Test route
@@ -213,31 +208,39 @@ app.post("/api/domain", async (req, res) => {
     });
   }
       }); 
-
-app.post("/api/vahan", async (req, res) => {
+ 
+const jar = new CookieJar();
+const client = wrapper(
+  axios.create({
+    jar,
+    withCredentials: true,
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  })
+);
+app.get("/api/vahan", async (req, res) => {
   try {
-    const jar = new CookieJar();
-    const client = wrapper(axios.create({ jar, withCredentials: true }));
-
-    // 1️⃣ Load login page (creates session)
-    const pageRes = await client.get(
-      "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
-      { headers: { "User-Agent": "Mozilla/5.0" } }
+    const response = await client.get(
+      "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml"
     );
 
-    const $ = cheerio.load(pageRes.data);
-    const viewState = $("input[name='javax.faces.ViewState']").val();
+    const $ = cheerio.load(response.data);
 
-    // 2️⃣ Load captcha (same session)
+    const viewState = $('input[name="javax.faces.ViewState"]').val();
+    const txtNumber = $('input[name="txtNumber"]').val();
+
+    if (!viewState) {
+      return res.status(500).json({
+        success: false,
+        message: "ViewState not found",
+      });
+    }
+
+    // Get captcha with same session
     const captchaRes = await client.get(
       "https://vahan.parivahan.gov.in/nrservices/cap_img.jsp",
-      {
-        responseType: "arraybuffer",
-        headers: {
-          Referer: "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
-          "User-Agent": "Mozilla/5.0",
-        },
-      }
+      { responseType: "arraybuffer" }
     );
 
     const captchaBase64 = Buffer.from(captchaRes.data).toString("base64");
@@ -246,56 +249,69 @@ app.post("/api/vahan", async (req, res) => {
       success: true,
       captchaBase64,
       viewState,
+      txtNumber,
     });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false });
+  } catch (error) {
+    console.log("CAPTCHA ERROR:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load captcha",
+    });
   }
 });
+
+/* ==========================================
+   STEP 2 - LOGIN
+========================================== */
 app.post("/api/login", async (req, res) => {
   try {
-    const { captcha, mobile_no, viewState } = req.body;
+    const { mobile_no, captcha, viewState } = req.body;
 
-    const jar = new CookieJar();
-    const client = wrapper(axios.create({ jar, withCredentials: true }));
+    if (!mobile_no || !captcha || !viewState) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
 
     const formData = qs.stringify({
-      "loginForm": "loginForm",
-      "loginForm:txt_MOBILE_NO": mobile_no,
-      "loginForm:txt_ALPHA_NUMERIC": captcha,
-      "loginForm:btnLogin": "Next",
+      masterLayout: "masterLayout",
+      TfMOBILENO: mobile_no,
+      txt_ALPHA_NUMERIC: captcha,
+      btRtoLogin: "Next",
       "javax.faces.ViewState": viewState,
     });
 
-    const response = await client.post(
+    const loginResponse = await client.post(
       "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
       formData,
       {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0",
-          "Referer":
-            "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml",
-          "Origin": "https://vahan.parivahan.gov.in",
         },
-        maxRedirects: 0,
       }
     );
+    let message="unknown";
+     const result =  loginResponse.data;
+     if(result.includes("Mobile number is not registered with NR Services Portal.")){
+      message="user are not register";
+     }
+     else if(result.includes("password")){
+      message="user are register"
+     }
 
-    const html = response.data;
+    res.json({
+      success: true,
+       message
+    });
 
-    let message;
-    if (html.includes("txt_PASSWORD")) {
-      message = "User is REGISTERED ✅";
-    } else if (html.includes("not registered")) {
-      message = "User is NOT registered ❌";
-    } 
-    res.json({ success: true, message });
-
-  } catch (err) {
-    console.error("Login Error:", err.message);
-    res.status(500).json({ success: false });
+  } catch (error) {
+    console.log("LOGIN ERROR:", error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      message: "Login failed",
+    });
   }
 });
 

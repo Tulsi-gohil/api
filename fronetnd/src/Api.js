@@ -1,16 +1,16 @@
-import { useState } from "react";
-import axios from "axios";
+import React, { useState } from "react";
 
 function Api() {
   const [mobile, setMobile] = useState("");
   const [captchaImg, setCaptchaImg] = useState("");
   const [captcha, setCaptcha] = useState("");
   const [viewState, setViewState] = useState("");
-  const [sessionCookie, setSessionCookie] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  // STEP 1: Get captcha + session
+  // ===============================
+  // STEP 1 - LOAD CAPTCHA
+  // ===============================
   const loadCaptcha = async () => {
     if (mobile.length !== 10) {
       alert("Enter valid 10-digit mobile number");
@@ -22,54 +22,79 @@ function Api() {
     setCaptcha("");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/vahan");
+      const res = await fetch("http://localhost:5000/api/vahan");
 
-      setCaptchaImg(`data:image/png;base64,${res.data.captchaBase64}`);
-      setViewState(res.data.viewState);
-      setSessionCookie(res.data.sessionCookie);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to load captcha");
+      }
+
+      setCaptchaImg(`data:image/png;base64,${data.captchaBase64}`);
+      setViewState(data.viewState);
+
     } catch (err) {
-      alert("Failed to load captcha");
+      alert(err.message);
+      setCaptchaImg("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===============================
+  // STEP 2 - LOGIN
+  // ===============================
+  const handleLogin = async () => {
+    if (!captcha) {
+      alert("Enter captcha");
+      return;
     }
 
-    setLoading(false);
+    setLoading(true);
+
+    try {
+      const res = await fetch("http://localhost:5000/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mobile_no: mobile,
+          captcha: captcha,
+          viewState: viewState,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      setResult(data.message);
+
+    } catch (err) {
+      alert(err.message);
+      setCaptcha("");
+      setCaptchaImg("");
+    } finally {
+      setLoading(false);
+    }
   };
-// Change the login request to explicitly handle errors
-const handleLogin = async () => {
-  if (!captcha) return alert("Enter captcha");
-  setLoading(true);
-
-  try {
-    const res = await axios.post("http://localhost:5000/api/login", {
-      mobile_no: mobile,
-      captcha,
-      viewState,
-      sessionCookie,
-    });
-    setResult(res.data);
-  } catch (err) {
-    // Check if the backend sent a specific message
-    const errMsg = err.response?.data?.message || "Login failed";
-    alert(errMsg);
-    setCaptchaImg(""); // Reset captcha on failure
-  } finally {
-    setLoading(false);
-  }
-};
-
 
   return (
-    <div style={{ width: 320 }}>
-      <h3>Vahan Mobile Check</h3>
+    <div>
+      <h2>Vahan Mobile Check</h2>
 
       <input
         type="text"
-        placeholder="Mobile Number"
+        placeholder="Enter Mobile Number"
         maxLength={10}
         value={mobile}
         onChange={(e) => {
           setMobile(e.target.value.replace(/\D/g, ""));
-          setCaptchaImg("");
           setCaptcha("");
+          setCaptchaImg("");
           setResult(null);
         }}
       />
@@ -82,9 +107,11 @@ const handleLogin = async () => {
 
       {captchaImg && (
         <>
-          <div style={{ margin: "15px 0" }}>
+          <div style={{ marginTop: 20 }}>
             <img src={captchaImg} alt="captcha" />
           </div>
+
+          <br />
 
           <input
             type="text"
@@ -96,15 +123,13 @@ const handleLogin = async () => {
           <br /><br />
 
           <button onClick={handleLogin} disabled={loading}>
-            Submit
+            {loading ? "Please wait..." : "Submit"}
           </button>
         </>
       )}
-
+ 
       {result && (
-        <pre style={{ marginTop: 15 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
+        <h3>Result: {result}</h3>
       )}
     </div>
   );

@@ -4,12 +4,12 @@ import "./App.css";
 import GoogleSearch from "./GoogleSearch";
 import ApiAccount from "./ApiAccount";
 import StudentDetils from "./StudentDetils";
-import Domin from "./Domin";
+import Domin from "./Domin"; 
 import Api from "./Api";
 function App() {
   return(
     <>
-    <Router>
+    <Router> 
       <Routes>
         <Route path="/GoogleSearch" element={<GoogleSearch />}/>
         <Route path="/ApiAccount" element={<ApiAccount />}/>
