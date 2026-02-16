@@ -196,7 +196,7 @@ app.post("/api/domain", async (req, res) => {
 
     app.post("/api/vahan", async (req, res) => {
       try {
-        const response = await client.get(
+        const response = await client.post(
           "https://vahan.parivahan.gov.in/nrservices/faces/user/citizen/citizenlogin.xhtml"
         );
 
