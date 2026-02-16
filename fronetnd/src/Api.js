@@ -20,7 +20,14 @@ function Api() {
     setCaptcha("");
 
     try {
-      const res = await fetch("https://mediumturquoise-lemur-967744.hostingersite.com/api/vahan");
+      const res = await fetch("https://mediumturquoise-lemur-967744.hostingersite.com/api/vahan",{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        
+      }
+      );
 
       const data = await res.json();
 
