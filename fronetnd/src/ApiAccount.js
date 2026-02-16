@@ -20,7 +20,14 @@ function ApiAccount() {
 
     try {
  
-      const tokenResponse = await fetch("http://localhost:5000/api/amazon"); 
+      const tokenResponse = await fetch("http://localhost:5000/api/amazon",{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({})
+      }
+      ); 
       const tokenResult = await tokenResponse.json();  
       setToken(tokenResult.Token);
 
