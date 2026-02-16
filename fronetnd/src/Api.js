@@ -8,9 +8,7 @@ function Api() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  // ===============================
-  // STEP 1 - LOAD CAPTCHA
-  // ===============================
+ 
   const loadCaptcha = async () => {
     if (mobile.length !== 10) {
       alert("Enter valid 10-digit mobile number");

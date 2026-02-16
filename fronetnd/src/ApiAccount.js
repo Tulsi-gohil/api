@@ -4,42 +4,46 @@ import "./App.css";
 function ApiAccount() {
   const [number, setNumber] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [Token, setToken] = useState("");
+  const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
   const handleSearch = async () => {
-    if (!number) {
+    if (!number ) {
       setError("Please enter mobile number");
       return;
     }
 
     setLoading(true);
     setError("");
-    setMessage("");
+    setData(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({  
-          email :number
-          
-         })
-      });
+ 
+      const tokenResponse = await fetch("http://localhost:5000/api/amazon"); 
+      const tokenResult = await tokenResponse.json();  
+      setToken(tokenResult.Token);
 
-      const data = await response.json();
+      // Step 2: Fetch Account Data
+      const accountResponse = await fetch(
+        "http://localhost:5000/api/account",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            Token: Token,
+            Email: number,
+          }),
+        }
+      );
 
-      // ✅ USE BACKEND RESPONSE DIRECTLY
-      if (data.message) {
-        setMessage(data.message );
-      } else {
-        setMessage("No response received");
-      }
-
+      const accountResult = await accountResponse.json();
+ 
+      setData(accountResult);
     } catch (err) {
-      setError("Something went wrong");
+      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -51,18 +55,26 @@ function ApiAccount() {
 
       <div className="search-box">
         <input
-          type="number"
+          type="text"
           placeholder="Enter mobile number"
           value={number}
           onChange={(e) => setNumber(e.target.value)}
         />
+
         <button onClick={handleSearch} disabled={loading}>
           {loading ? "Checking..." : "Search"}
         </button>
       </div>
 
       {error && <p className="error">{error}</p>}
-      {message && <p>{message}</p>}
+ 
+
+      {data && (
+        <div>
+          <h3>Account Data:</h3>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+        </div>
+      )}
     </div>
   );
 }
