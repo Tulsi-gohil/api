@@ -22,7 +22,7 @@ function Api() {
     setCaptcha("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/vahan");
+      const res = await fetch("https://mediumturquoise-lemur-967744.hostingersite.com/api/vahan");
 
       const data = await res.json();
 
@@ -53,7 +53,7 @@ function Api() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/login", {
+      const res = await fetch("https://mediumturquoise-lemur-967744.hostingersite.com/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
